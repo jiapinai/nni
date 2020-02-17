@@ -23,6 +23,7 @@ import { kubernetesScriptFormat, KubernetesTrialJobDetail } from './kubernetesDa
 import { KubernetesJobRestServer } from './kubernetesJobRestServer';
 
 const fs = require('fs');
+const os = require('os');
 
 /**
  * Training Service implementation for Kubernetes
@@ -291,7 +292,8 @@ abstract class KubernetesTrainingService {
     protected async createNFSStorage(nfsServer: string, nfsPath: string): Promise<void> {
         await cpp.exec(`mkdir -p ${this.trialLocalNFSTempFolder}`);
         try {
-            await cpp.exec(`sudo mount ${nfsServer}:${nfsPath} ${this.trialLocalNFSTempFolder}`);
+            const mountOpts = this.getMountOpts()
+            await cpp.exec(`sudo mount ${mountOpts} ${nfsServer}:${nfsPath} ${this.trialLocalNFSTempFolder}`);
         } catch (error) {
             const mountError: string = `Mount NFS ${nfsServer}:${nfsPath} to ${this.trialLocalNFSTempFolder} failed, error is ${error}`;
             this.log.error(mountError);
@@ -300,6 +302,20 @@ abstract class KubernetesTrainingService {
         }
 
         return Promise.resolve();
+    }
+
+    protected getMountOpts(): string {
+        // this.log.info(`try to mount on ${os.platform()} ${os.release()}`)
+        let mountOpts = ''
+        switch (os.platform()) {
+            case 'darwin':
+                mountOpts = ' -t nfs -o vers=4 '
+                break;
+            default:
+                mountOpts = ''
+                break;
+        }
+        return mountOpts;
     }
 
     protected async createRegistrySecret(filePath: string | undefined): Promise<string | undefined> {
